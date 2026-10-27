@@ -18,15 +18,16 @@ type MedicineHandler struct {
 	cfg *config.Config
 }
 
-// RegisterMedicines wires medicine routes. Create/Update/Delete require admin.
+// RegisterMedicines wires medicine routes. Read is open to any clinician; the
+// formulary is managed by users holding medicine:manage (typically admins).
 func RegisterMedicines(r gin.IRouter, db *gorm.DB, cfg *config.Config) {
 	h := &MedicineHandler{db: db, cfg: cfg}
-	r.GET("/medicines", h.List)
-	r.POST("/medicines", middleware.AdminRequired(), h.Create)
-	r.PUT("/medicines/:id", middleware.AdminRequired(), h.Update)
-	r.DELETE("/medicines/:id", middleware.AdminRequired(), h.Delete)
+	r.GET("/medicines", middleware.RequireAny(db, "medicine:read"), h.List)
+	r.POST("/medicines", middleware.RequireAny(db, "medicine:manage"), h.Create)
+	r.PUT("/medicines/:id", middleware.RequireAny(db, "medicine:manage"), h.Update)
+	r.DELETE("/medicines/:id", middleware.RequireAny(db, "medicine:manage"), h.Delete)
 	// Pricing is just the price field, but a dedicated route documents intent.
-	r.PUT("/medicines/:id/price", middleware.AdminRequired(), h.UpdatePrice)
+	r.PUT("/medicines/:id/price", middleware.RequireAny(db, "medicine:manage"), h.UpdatePrice)
 }
 
 type medicineReq struct {
@@ -41,6 +42,10 @@ type medicineReq struct {
 	Price        float64 `json:"price"`
 	Currency     string  `json:"currency"`
 	IsActive     *bool   `json:"is_active"`
+	// StockQty / ReorderLevel implement pharmacy inventory management: on-hand
+	// quantity and the replenishment threshold used by low-stock alerts.
+	StockQty     *float64 `json:"stock_qty"`
+	ReorderLevel *float64 `json:"reorder_level"`
 }
 
 // List returns paginated medicines, filterable by keyword and category.
@@ -88,6 +93,16 @@ func (h *MedicineHandler) Create(c *gin.Context) {
 	if currency == "" {
 		currency = "CNY"
 	}
+	// Default the reorder threshold to zero so an unset value never masks a
+	// genuine stock-out; callers should set it explicitly per SKU.
+	stockQty := 0.0
+	reorderLevel := 0.0
+	if req.StockQty != nil {
+		stockQty = *req.StockQty
+	}
+	if req.ReorderLevel != nil {
+		reorderLevel = *req.ReorderLevel
+	}
 	med := models.Medicine{
 		Code:         req.Code,
 		NameZH:       req.NameZH,
@@ -100,6 +115,8 @@ func (h *MedicineHandler) Create(c *gin.Context) {
 		Price:        req.Price,
 		Currency:     currency,
 		IsActive:     active,
+		StockQty:     stockQty,
+		ReorderLevel: reorderLevel,
 	}
 	if err := h.db.Create(&med).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": i18n.T(c, "server_error")})
@@ -139,6 +156,14 @@ func (h *MedicineHandler) Update(c *gin.Context) {
 	}
 	if req.IsActive != nil {
 		med.IsActive = *req.IsActive
+	}
+	// Inventory fields are pointer-guarded so a partial update never clobbers
+	// existing stock quantities with zero.
+	if req.StockQty != nil {
+		med.StockQty = *req.StockQty
+	}
+	if req.ReorderLevel != nil {
+		med.ReorderLevel = *req.ReorderLevel
 	}
 	if err := h.db.Save(&med).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": i18n.T(c, "server_error")})

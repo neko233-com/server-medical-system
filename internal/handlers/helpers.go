@@ -8,6 +8,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// atoui parses a path/query parameter into a uint, returning 0 on failure.
+func atoui(s string) uint {
+	n, _ := strconv.ParseUint(s, 10, 64)
+	return uint(n)
+}
+
 // Pagination is returned alongside list endpoints.
 type Pagination struct {
 	Page     int   `json:"page"`

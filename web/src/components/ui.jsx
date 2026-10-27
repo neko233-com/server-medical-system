@@ -139,9 +139,10 @@ export function Modal({ open, onClose, title, children, footer, width = 520 }) {
   );
 }
 
-export function StatCard({ label, value, icon, tone = 'primary', hint }) {
+export function StatCard({ label, value, icon, tone = 'primary', hint, onClick }) {
+  const cls = `stat stat--${tone}${onClick ? ' stat--clickable' : ''}`;
   return (
-    <div className={`stat stat--${tone}`}>
+    <div className={cls} onClick={onClick} role={onClick ? 'button' : undefined}>
       <div className="stat__icon">
         <Reicon name={icon} size={22} />
       </div>

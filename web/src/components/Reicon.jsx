@@ -2,19 +2,27 @@
 // `.toSvg(options)` method that returns an SVG string — perfect for React via
 // dangerouslySetInnerHTML. Missing icons fall back gracefully.
 import {
-  Home, Users, User, Pill, Stethoscope, Calendar, Calendar2, Settings, Plus, Edit,
+  Home, Users, User, UserCheck, Pill, Stethoscope, Calendar, Calendar2, Settings, Plus, Edit,
   Trash, Search, ChevronDown, Language, Logout, Menu, Check, AlertTriangle, Flask,
   Heart, Activity, Clipboard, Note, Notebook, Dollar, Dollar2, Globe, Refresh, Print,
   Filter, Box, Box2, Hospital, Phone, Tag, Save, Eye, ArrowRight, ArrowLeft, X, Grid,
-  ChevronRight, Lock, ChevronLeft,
+  ChevronRight, Lock, ChevronLeft, Shield, ShieldCheck, Key, Building, Building2,
+  Printer as PrinterIcon, Scan, Image, Images, Scissors, Layers, Cpu, Monitor, Wifi,
+  HardDrive, FileText, ClipboardList, CalendarCheck, Bandage, Dna, Microscope,
+  Thermometer, TestTube, Armchair, Briefcase,
+  MessageCircle, Send, Paperclip,
 } from 'reicon';
 
 const ICONS = {
-  Home, Users, User, Pill, Stethoscope, Calendar, Calendar2, Settings, Plus, Edit,
+  Home, Users, User, UserCheck, Pill, Stethoscope, Calendar, Calendar2, Settings, Plus, Edit,
   Trash, Search, ChevronDown, Language, Logout, Menu, Check, AlertTriangle, Flask,
   Heart, Activity, Clipboard, Note, Notebook, Dollar, Dollar2, Globe, Refresh, Print,
   Filter, Box, Box2, Hospital, Phone, Tag, Save, Eye, ArrowRight, ArrowLeft, X, Grid,
-  ChevronRight, Lock, ChevronLeft,
+  ChevronRight, Lock, ChevronLeft, Shield, ShieldCheck, Key, Building, Building2,
+  Printer: PrinterIcon, Scan, Image, Images, Scissors, Layers, Cpu, Monitor, Wifi,
+  HardDrive, FileText, ClipboardList, CalendarCheck, Bandage, Dna, Microscope,
+  Thermometer, TestTube, Armchair, Briefcase,
+  MessageCircle, Send, Paperclip,
 };
 
 // Map semantic names that may not exist in the set to verified alternatives.
@@ -30,6 +38,25 @@ const FALLBACK = {
   grid: 'Grid',
   info: 'AlertTriangle',
   checkcircle: 'Check',
+  // new semantic aliases
+  keyround: 'Key',
+  userplus: 'UserCheck',
+  usercog: 'UserCheck',
+  scanline: 'Scan',
+  stethoscope2: 'Stethoscope',
+  crosshair: 'Activity',
+  mappin: 'Building',
+  door: 'Building2',
+  target: 'Activity',
+  room: 'Building2',
+  printer: 'Printer',
+  shield: 'Shield',
+  image: 'Image',
+  images: 'Images',
+  surgery: 'Scissors',
+  scan: 'Scan',
+  microscope: 'Microscope',
+  building: 'Building',
 };
 
 export default function Reicon({ name, size = 20, color = 'currentColor', weight = 'Outline', className = '', style = {} }) {

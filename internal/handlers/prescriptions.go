@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/neko233-com/server-medical-system/internal/i18n"
+	"github.com/neko233-com/server-medical-system/internal/middleware"
 	"github.com/neko233-com/server-medical-system/internal/models"
 )
 
@@ -17,26 +18,27 @@ type PrescriptionHandler struct {
 	db *gorm.DB
 }
 
-// RegisterPrescriptions wires prescription routes.
+// RegisterPrescriptions wires prescription routes with RBAC permission checks.
 func RegisterPrescriptions(r gin.IRouter, db *gorm.DB) {
 	h := &PrescriptionHandler{db: db}
-	r.GET("/prescriptions", h.List)
-	r.POST("/prescriptions", h.Create)
-	r.GET("/prescriptions/:id", h.Get)
+	r.GET("/prescriptions", middleware.RequireAny(db, "prescription:read"), h.List)
+	r.POST("/prescriptions", middleware.RequireAny(db, "prescription:create"), h.Create)
+	r.GET("/prescriptions/:id", middleware.RequireAny(db, "prescription:read"), h.Get)
 }
 
 type rxItemReq struct {
-	MedicineID uint    `json:"medicine_id"`
-	Quantity   int     `json:"quantity"`
-	Dosage     string  `json:"dosage"`
-	Frequency  string  `json:"frequency"`
+	MedicineID uint   `json:"medicine_id"`
+	Quantity   int    `json:"quantity"`
+	Dosage     string `json:"dosage"`
+	Frequency  string `json:"frequency"`
 }
 
 type prescriptionReq struct {
-	PatientID uint         `json:"patient_id"`
-	CaseID    uint         `json:"case_id"`
-	Items     []rxItemReq  `json:"items"`
-	Status    string       `json:"status"`
+	PatientID uint        `json:"patient_id"`
+	CaseID    uint        `json:"case_id"`
+	RoomID    uint        `json:"room_id"`
+	Items     []rxItemReq `json:"items"`
+	Status    string      `json:"status"`
 }
 
 // List returns prescriptions, optionally filtered by patient.
@@ -90,8 +92,15 @@ func (h *PrescriptionHandler) Create(c *gin.Context) {
 		DoctorID:       doctor.ID,
 		DoctorName:     doctor.Name,
 		CaseID:         req.CaseID,
+		RoomID:         req.RoomID,
 		Currency:       "CNY",
 		Status:         req.Status,
+	}
+	if req.RoomID != 0 {
+		var room models.Room
+		if h.db.First(&room, req.RoomID).Error == nil {
+			rx.RoomNo = room.RoomNo
+		}
 	}
 	if rx.Status == "" {
 		rx.Status = "issued"

@@ -11,6 +11,7 @@ import (
 	"github.com/neko233-com/server-medical-system/internal/i18n"
 	"github.com/neko233-com/server-medical-system/internal/middleware"
 	"github.com/neko233-com/server-medical-system/internal/models"
+	"github.com/neko233-com/server-medical-system/internal/rbac"
 )
 
 // AuthHandler exposes login / current-user endpoints.
@@ -59,10 +60,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": i18n.T(c, "server_error")})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
+	perms, _ := rbac.UserPermissions(h.db, user.ID)
+	c.JSON(http.StatusOK, gin.H{"token": token, "user": user, "permissions": perms})
 }
 
-// Me returns the currently authenticated user. Mounted with AuthRequired.
+// Me returns the currently authenticated user plus effective permissions.
+// Mounted with AuthRequired.
 func Me(c *gin.Context, db *gorm.DB) {
 	uid, _ := c.Get("uid")
 	var user models.User
@@ -70,5 +73,6 @@ func Me(c *gin.Context, db *gorm.DB) {
 		c.JSON(http.StatusNotFound, gin.H{"error": i18n.T(c, "not_found")})
 		return
 	}
-	c.JSON(http.StatusOK, user)
+	perms, _ := rbac.UserPermissions(db, user.ID)
+	c.JSON(http.StatusOK, gin.H{"user": user, "permissions": perms})
 }

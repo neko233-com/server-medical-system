@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/neko233-com/server-medical-system/internal/i18n"
+	"github.com/neko233-com/server-medical-system/internal/middleware"
 	"github.com/neko233-com/server-medical-system/internal/models"
 )
 
@@ -16,17 +17,18 @@ type CaseHandler struct {
 	db *gorm.DB
 }
 
-// RegisterCases wires medical-case routes.
+// RegisterCases wires medical-case routes with RBAC permission checks.
 func RegisterCases(r gin.IRouter, db *gorm.DB) {
 	h := &CaseHandler{db: db}
-	r.GET("/cases", h.List)
-	r.POST("/cases", h.Create)
-	r.GET("/cases/:id", h.Get)
-	r.PUT("/cases/:id", h.Update)
+	r.GET("/cases", middleware.RequireAny(db, "case:read"), h.List)
+	r.POST("/cases", middleware.RequireAny(db, "case:write"), h.Create)
+	r.GET("/cases/:id", middleware.RequireAny(db, "case:read"), h.Get)
+	r.PUT("/cases/:id", middleware.RequireAny(db, "case:write"), h.Update)
 }
 
 type caseReq struct {
 	PatientID      uint   `json:"patient_id"`
+	RoomID         uint   `json:"room_id"`
 	VisitDate      string `json:"visit_date"` // RFC3339; optional
 	ChiefComplaint string `json:"chief_complaint"`
 	PresentIllness string `json:"present_illness"`
@@ -85,6 +87,7 @@ func (h *CaseHandler) Create(c *gin.Context) {
 		PatientID:      req.PatientID,
 		DoctorID:       doctor.ID,
 		DoctorName:     doctor.Name,
+		RoomID:         req.RoomID,
 		VisitDate:      visit,
 		ChiefComplaint: req.ChiefComplaint,
 		PresentIllness: req.PresentIllness,
@@ -92,6 +95,12 @@ func (h *CaseHandler) Create(c *gin.Context) {
 		Diagnosis:      req.Diagnosis,
 		Notes:          req.Notes,
 		CaseNo:         generateCaseNo(visit, doctor.ID),
+	}
+	if req.RoomID != 0 {
+		var room models.Room
+		if h.db.First(&room, req.RoomID).Error == nil {
+			medCase.RoomNo = room.RoomNo
+		}
 	}
 	_ = role
 	if err := h.db.Create(&medCase).Error; err != nil {

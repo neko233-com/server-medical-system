@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/neko233-com/server-medical-system/internal/i18n"
+	"github.com/neko233-com/server-medical-system/internal/middleware"
 	"github.com/neko233-com/server-medical-system/internal/models"
 )
 
@@ -15,14 +16,14 @@ type PatientHandler struct {
 	db *gorm.DB
 }
 
-// RegisterPatients wires patient CRUD routes.
+// RegisterPatients wires patient CRUD routes with RBAC permission checks.
 func RegisterPatients(r gin.IRouter, db *gorm.DB) {
 	h := &PatientHandler{db: db}
-	r.GET("/patients", h.List)
-	r.POST("/patients", h.Create)
-	r.GET("/patients/:id", h.Get)
-	r.PUT("/patients/:id", h.Update)
-	r.DELETE("/patients/:id", h.Delete)
+	r.GET("/patients", middleware.RequireAny(db, "patient:read"), h.List)
+	r.POST("/patients", middleware.RequireAny(db, "patient:write"), h.Create)
+	r.GET("/patients/:id", middleware.RequireAny(db, "patient:read"), h.Get)
+	r.PUT("/patients/:id", middleware.RequireAny(db, "patient:write"), h.Update)
+	r.DELETE("/patients/:id", middleware.RequireAny(db, "patient:write"), h.Delete)
 }
 
 type patientReq struct {
