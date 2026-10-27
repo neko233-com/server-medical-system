@@ -7,7 +7,7 @@
 #     curl -fsSL https://raw.githubusercontent.com/neko233-com/server-medical-system/main/install.sh | bash
 #
 #  常用环境变量：
-#     PORT=8080            # 默认服务端口（默认 6970）
+#     PORT=7000            # 服务端口（默认 6970）
 #     INSTALL_DIR=/opt/medical   # 安装目录（默认 /opt/medical）
 #     VERSION=v1.0.0       # 指定版本（默认 latest）
 #     INSTALL_SERVICE=1    # 安装并启动 systemd 服务（Linux, root）
