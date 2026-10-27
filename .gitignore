@@ -1,0 +1,23 @@
+# Binaries / databases
+*.exe
+*.db
+*.sqlite
+medsrv
+/server-medical-system
+
+# Go
+/bin/
+
+# Node / frontend
+web/node_modules/
+web/dist/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.env
+
+# Local tooling
+.codely-cli/
