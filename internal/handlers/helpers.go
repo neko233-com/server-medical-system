@@ -87,3 +87,12 @@ func randomSuffix() string {
 	}
 	return string(b)
 }
+
+// generateNo builds a human-readable business number with the given prefix,
+// e.g. generateNo("APT") -> "APT20261028-4821".
+//
+// The format is `<PREFIX><YYYYMMDD>-<random>` which keeps numbers sortable by
+// creation date while remaining unique across concurrent inserts.
+func generateNo(prefix string) string {
+	return prefix + time.Now().Format("20060102") + "-" + randomSuffix()
+}

@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"fmt"
 	"log"
 
 	"golang.org/x/crypto/bcrypt"
@@ -50,6 +51,12 @@ var permissionCatalog = []permissionDef{
 	{"inventory:read", "查看库存", "View inventory", "库存", "浏览药品库存"},
 	{"inventory:manage", "管理库存", "Manage inventory", "库存", "药品入库/出库与盘点"},
 	{"report:read", "运营报表", "Operations reports", "运营", "查看全院运营分析与报表"},
+	{"appointment:read", "查看预约", "View appointments", "预约", "浏览预约挂号"},
+	{"appointment:manage", "管理预约", "Manage appointments", "预约", "预约建档/改期/叫号"},
+	{"bed:read", "查看床位", "View beds", "住院", "浏览病区与床位"},
+	{"bed:manage", "管理床位", "Manage beds", "住院", "入院/出院/床位调配"},
+	{"billing:read", "查看收费", "View billing", "收费", "浏览结算单"},
+	{"billing:manage", "管理收费", "Manage billing", "收费", "开单/收费/退费"},
 	{"user:read", "查看账号", "View users", "账号", "浏览用户账号"},
 	{"user:manage", "管理账号", "Manage users", "账号", "创建/停用账号"},
 	{"role:read", "查看角色", "View roles", "角色", "浏览角色"},
@@ -80,6 +87,7 @@ var roleDefs = []roleDef{
 			"dashboard:view", "patient:read", "patient:write", "case:read", "case:write",
 			"prescription:read", "prescription:create", "medicine:read", "surgery:read",
 			"imaging:read", "imaging:upload", "room:read", "printer:read",
+			"appointment:read", "billing:read",
 		},
 	},
 	{
@@ -88,6 +96,7 @@ var roleDefs = []roleDef{
 		Permissions: []string{
 			"dashboard:view", "patient:read", "patient:write", "case:read",
 			"prescription:read", "medicine:read", "imaging:read", "room:read",
+			"appointment:read", "bed:read", "bed:manage",
 		},
 	},
 	{
@@ -96,6 +105,8 @@ var roleDefs = []roleDef{
 		Permissions: []string{
 			"dashboard:view", "patient:read", "patient:write", "prescription:read",
 			"medicine:read", "room:read", "printer:read",
+			"appointment:read", "appointment:manage", "billing:read", "billing:manage",
+			"bed:read",
 		},
 	},
 	{
@@ -229,6 +240,61 @@ func SeedRooms(db *gorm.DB, seedDemo bool) {
 		log.Fatalf("seed: create rooms: %v", err)
 	}
 	log.Printf("seed: created %d rooms", len(rooms))
+}
+
+// SeedWards creates the inpatient wards together with their beds so the
+// occupancy dashboard and bed management page have meaningful baseline data.
+//
+// Each ward holds a small set of beds in different states (available /
+// occupied / reserved / maintenance) which exercises the occupancy maths.
+func SeedWards(db *gorm.DB, seedDemo bool) {
+	var count int64
+	db.Model(&models.Ward{}).Count(&count)
+	if count > 0 {
+		return
+	}
+	wards := []models.Ward{
+		{Code: "W-IN", NameZH: "内科病区", NameEN: "Internal Medicine Ward", Department: "内科", Floor: "5F", Status: "active"},
+		{Code: "W-SU", NameZH: "外科病区", NameEN: "Surgery Ward", Department: "外科", Floor: "6F", Status: "active"},
+		{Code: "W-ICU", NameZH: "重症监护病房", NameEN: "Intensive Care Unit", Department: "重症医学科", Floor: "7F", Status: "active"},
+	}
+	if err := db.Create(&wards).Error; err != nil {
+		log.Fatalf("seed: create wards: %v", err)
+	}
+	// 每个病区 10 张床：0-5 可用，6-8 占用，9 维护，形成可计算的占用率。
+	bedCounts := map[string]int{"W-IN": 10, "W-SU": 10, "W-ICU": 6}
+	var beds []models.Bed
+	for _, w := range wards {
+		n := bedCounts[w.Code]
+		for i := 1; i <= n; i++ {
+			bedNo := fmt.Sprintf("%02d", i)
+			status := "available"
+			daily := 80.0
+			switch w.Code {
+			case "W-ICU":
+				daily = 480.0
+				if i <= 4 {
+					status = "occupied"
+				} else if i == 5 {
+					status = "reserved"
+				}
+			default:
+				if i >= 7 && i <= 9 {
+					status = "occupied"
+				} else if i == 10 {
+					status = "maintenance"
+				}
+			}
+			beds = append(beds, models.Bed{
+				WardID: w.ID, WardName: w.NameZH, BedNo: bedNo,
+				Code: w.Code + "-" + bedNo, Status: status, DailyRate: daily,
+			})
+		}
+	}
+	if err := db.CreateInBatches(beds, 50).Error; err != nil {
+		log.Fatalf("seed: create beds: %v", err)
+	}
+	log.Printf("seed: created %d wards / %d beds", len(wards), len(beds))
 }
 
 // SeedPrinters creates a doctor-bound thermal printer and a global default.

@@ -85,6 +85,11 @@ body {
 
 .app-content { padding: 26px 28px 40px; overflow: auto; flex: 1; }
 .stack-lg { display: flex; flex-direction: column; gap: 20px; }
+
+/* ---------- Two column grid used by analytics panels ---------- */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.sub-head { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: var(--muted); }
+@media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
 .center-pad { display: grid; place-items: center; padding: 40px; }
 
 /* ---------- Language switcher ---------- */
@@ -109,7 +114,12 @@ body {
 .btn--ghost { background: var(--surface); border-color: var(--border); color: var(--text); }
 .btn--ghost:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
 .btn--secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.btn--danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn--danger:hover:not(:disabled) { filter: brightness(.94); }
 .btn--block { width: 100%; justify-content: center; }
+
+/* ---------- Pagination ---------- */
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
 
 /* ---------- Inputs ---------- */
 .input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 14px; color: var(--text); transition: border-color .15s, box-shadow .15s; font-family: inherit; }
@@ -163,6 +173,8 @@ body {
 .stat--teal .stat__icon { background: var(--blue); }
 .stat--violet .stat__icon { background: var(--violet); }
 .stat--amber .stat__icon { background: var(--amber); }
+.stat--green .stat__icon { background: var(--green); }
+.stat--red .stat__icon { background: var(--danger); }
 .stat__meta { display: flex; flex-direction: column; }
 .stat__value { font-size: 24px; font-weight: 800; line-height: 1; }
 .stat__label { font-size: 13px; color: var(--muted); margin-top: 4px; }
@@ -178,6 +190,7 @@ body {
 .quick-card__icon--teal { background: var(--blue); }
 .quick-card__icon--violet { background: var(--violet); }
 .quick-card__icon--amber { background: var(--amber); }
+.quick-card__icon--green { background: var(--green); }
 .quick-card__icon--rose { background: #e0457b; }
 .quick-card__label { flex: 1; font-weight: 600; }
 

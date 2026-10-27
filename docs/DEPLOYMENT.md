@@ -1,6 +1,42 @@
 # 部署指南 · DEPLOYMENT
 
-## 一、一键部署（推荐）
+## 一、一行命令安装（无需克隆仓库）
+
+安装器负责：下载或从源码编译**单二进制** → 生成带随机 `JWT_SECRET` 的 `.env` → 创建数据目录 → 可选注册系统服务。
+发布物已内嵌前端 SPA，目标机器无需 Go / Node。
+
+```bash
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/neko233-com/server-medical-system/main/install.sh | bash
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/neko233-com/server-medical-system/main/install.ps1 | iex"
+```
+
+| 变量（sh） | 参数（ps1） | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `PORT` | `-Port` | `6970` | 服务端口 |
+| `INSTALL_DIR` | `-InstallDir` | `/opt/medical` / `C:\Program Files\MedicalSystem` | 安装目录 |
+| `VERSION` | `-Version` | `latest` | 指定发布版本 |
+| `FROM_SOURCE=1` | `-FromSource` | 关 | 从源码编译（需 Go + Node） |
+| `INSTALL_SERVICE=1` | `-InstallService` | 关 | 注册 systemd / Windows 服务 |
+
+安装后的目录结构：
+
+```
+<INSTALL_DIR>/
+├── medical-system        # 唯一可执行文件（前端已内嵌）
+├── .env                  # 配置：PORT / JWT_SECRET / DB_PATH / UPLOAD_DIR / LOG_DIR
+└── data/                 # 运行时数据
+    ├── medical.db        # 内置 SQLite
+    ├── uploads/          # 影像样片
+    └── logs/             # 轮转日志
+```
+
+> `.env` 查找顺序：`ENV_FILE` → `./.env` → **可执行文件同目录**的 `.env`。
+> 最后一条保证以 systemd / Windows 服务方式运行时（工作目录不确定）依然能读到配置。
+
+## 二、一键部署（推荐）
 
 默认端口 **6970**（刻意避开常见的 8080 / 3000，减少冲突）。
 
@@ -30,7 +66,7 @@ SKIP_WEB=1   ./deploy.sh    # 跳过前端构建
 
 > 仅需把这两个产物与 `uploads/`（运行时自动生成）放在同一目录即可运行，无需安装 Go / Node。
 
-## 二、手动部署
+## 三、手动部署
 
 ```bash
 # 1) 构建前端
@@ -43,9 +79,9 @@ CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o medical-system ./cmd/server
 PORT=6970 ./medical-system
 ```
 
-访问 http://localhost:6970 ，登录 `admin` / `admin123`。
+访问 http://localhost:6970 ，登录 `root` / `root`。
 
-## 三、开发模式（前后端分离）
+## 四、开发模式（前后端分离）
 
 ```bash
 # 终端 1：后端（6970）
@@ -57,7 +93,7 @@ cd web && npm run dev
 
 代理配置见 `web/vite.config.js`（`BACKEND_PORT` 常量，须与后端端口一致）。
 
-## 四、环境变量
+## 五、环境变量
 
 复制 `.env.example` 为 `.env` 后按需修改（`.env` 已被 git 忽略）：
 
@@ -94,7 +130,7 @@ location /api/chat/ws {
 
 > 多实例部署时 WebSocket 中枢为进程内实现，需开启会话粘滞（sticky session）；聊天历史已落库，不受影响。详见 [CHAT.md](./CHAT.md)。
 
-## 五、作为系统服务运行
+## 六、作为系统服务运行
 
 ### systemd（Linux）
 
@@ -131,7 +167,7 @@ nssm set MedicalSystem AppEnvironmentExtra PORT=6970 JWT_SECRET=<随机串>
 nssm start MedicalSystem
 ```
 
-## 六、生产检查清单
+## 七、生产检查清单
 
 - [ ] 修改所有默认账号密码（`admin` / `doctor` …）
 - [ ] 设置高强度 `JWT_SECRET`
@@ -141,7 +177,7 @@ nssm start MedicalSystem
 - [ ] 定期备份数据库文件与 `uploads/`
 - [ ] 影像样片目录限制写权限并纳入备份
 
-## 七、升级
+## 八、升级
 
 ```bash
 git pull
@@ -150,7 +186,7 @@ git pull
 
 > 自动迁移（`AutoMigrate`）只会**新增**字段与表，不会删除数据；种子数据按「已存在则跳过」策略，重复执行安全。
 
-## 八、故障排查
+## 九、故障排查
 
 | 现象 | 原因 / 处理 |
 | --- | --- |

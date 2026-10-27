@@ -343,3 +343,93 @@ type ChatMessage struct {
 	FileSize    int64     `json:"file_size"`
 	CreatedAt   time.Time `gorm:"index" json:"created_at"`
 }
+
+// =============================================================================
+//  预约挂号 / 住院床位 / 收费结算
+// =============================================================================
+
+// Appointment is a booked outpatient slot (预约挂号).
+type Appointment struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	ApptNo      string    `gorm:"size:64;index" json:"appt_no"`
+	PatientID   uint      `gorm:"index" json:"patient_id"`
+	PatientName string    `gorm:"size:128" json:"patient_name"`
+	DoctorID    uint      `gorm:"index" json:"doctor_id"`
+	DoctorName  string    `gorm:"size:128" json:"doctor_name"`
+	Department  string    `gorm:"size:64" json:"department"`
+	RoomID      uint      `gorm:"index" json:"room_id"`
+	RoomNo      string    `gorm:"size:32" json:"room_no"`
+	SlotAt      time.Time `gorm:"index" json:"slot_at"`     // 预约时段
+	Source      string    `gorm:"size:16" json:"source"`    // online|phone|walkin|referral
+	ApptType    string    `gorm:"size:16" json:"appt_type"` // general|specialist|followup
+	Reason      string    `gorm:"type:text" json:"reason"`
+	Status      string    `gorm:"size:16;index" json:"status"` // booked|arrived|completed|cancelled|no_show
+	Notes       string    `gorm:"type:text" json:"notes"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// Ward is an inpatient area (病区) containing beds.
+type Ward struct {
+	ID         uint   `gorm:"primaryKey" json:"id"`
+	Code       string `gorm:"size:32;uniqueIndex" json:"code"`
+	NameZH     string `gorm:"size:128" json:"name_zh"`
+	NameEN     string `gorm:"size:128" json:"name_en"`
+	Department string `gorm:"size:64" json:"department"`
+	Floor      string `gorm:"size:16" json:"floor"`
+	DoctorID   uint   `json:"doctor_id"`
+	DoctorName string `gorm:"size:128" json:"doctor_name"`
+	Status     string `gorm:"size:16" json:"status"` // active|closed
+}
+
+// Bed is a single inpatient bed (住院床位).
+type Bed struct {
+	ID          uint       `gorm:"primaryKey" json:"id"`
+	WardID      uint       `gorm:"index" json:"ward_id"`
+	WardName    string     `gorm:"size:128" json:"ward_name"`
+	BedNo       string     `gorm:"size:32;index" json:"bed_no"`
+	Code        string     `gorm:"size:64" json:"code"`         // ward code + bed no
+	Status      string     `gorm:"size:16;index" json:"status"` // available|occupied|reserved|maintenance
+	PatientID   uint       `gorm:"index" json:"patient_id"`
+	PatientName string     `gorm:"size:128" json:"patient_name"`
+	AdmittedAt  *time.Time `json:"admitted_at"`
+	DailyRate   float64    `gorm:"type:decimal(12,2)" json:"daily_rate"`
+}
+
+// Invoice is a billing record (收费结算单).
+type Invoice struct {
+	ID             uint          `gorm:"primaryKey" json:"id"`
+	InvoiceNo      string        `gorm:"size:64;uniqueIndex" json:"invoice_no"`
+	PatientID      uint          `gorm:"index" json:"patient_id"`
+	PatientName    string        `gorm:"size:128" json:"patient_name"`
+	CaseID         uint          `json:"case_id"`         // 关联门诊病例（可空）
+	PrescriptionID uint          `json:"prescription_id"` // 关联处方（可空）
+	Department     string        `gorm:"size:64" json:"department"`
+	DoctorID       uint          `gorm:"index" json:"doctor_id"`
+	DoctorName     string        `gorm:"size:128" json:"doctor_name"`
+	Subtotal       float64       `gorm:"type:decimal(12,2)" json:"subtotal"`
+	Discount       float64       `gorm:"type:decimal(12,2)" json:"discount"`
+	Total          float64       `gorm:"type:decimal(12,2)" json:"total"`
+	Currency       string        `gorm:"size:8" json:"currency"`
+	Status         string        `gorm:"size:16;index" json:"status"`   // pending|paid|refunded|cancelled
+	PaymentMethod  string        `gorm:"size:16" json:"payment_method"` // cash|card|wechat|alipay|insurance
+	PaidAt         *time.Time    `json:"paid_at"`
+	Remark         string        `gorm:"type:text" json:"remark"`
+	Items          []InvoiceItem `gorm:"foreignKey:InvoiceID" json:"items,omitempty"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
+}
+
+// InvoiceItem is one chargeable line on an invoice (收费明细).
+type InvoiceItem struct {
+	ID        uint    `gorm:"primaryKey" json:"id"`
+	InvoiceID uint    `gorm:"index" json:"invoice_id"`
+	ItemType  string  `gorm:"size:16" json:"item_type"` // consult|medicine|exam|surgery|bed|other
+	RefID     uint    `json:"ref_id"`
+	NameZH    string  `gorm:"size:256" json:"name_zh"`
+	NameEN    string  `gorm:"size:256" json:"name_en"`
+	Qty       float64 `gorm:"type:decimal(12,2)" json:"qty"`
+	Unit      string  `gorm:"size:32" json:"unit"`
+	UnitPrice float64 `gorm:"type:decimal(12,2)" json:"unit_price"`
+	Amount    float64 `gorm:"type:decimal(12,2)" json:"amount"`
+}

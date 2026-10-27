@@ -16,6 +16,7 @@ export default function Operations() {
   const [depts, setDepts] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [status, setStatus] = useState(null);
+  const [revenue, setRevenue] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -25,12 +26,14 @@ export default function Operations() {
       client.get('/operations/departments'),
       client.get('/operations/doctors'),
       client.get('/operations/status'),
-    ]).then(([o, tr, dp, dc, st]) => {
+      client.get('/operations/revenue', { params: { days } }),
+    ]).then(([o, tr, dp, dc, st, rv]) => {
       if (o.status === 'fulfilled') setOv(o.value.data);
       if (tr.status === 'fulfilled') setTrend(tr.value.data.series || []);
       if (dp.status === 'fulfilled') setDepts(dp.value.data.items || []);
       if (dc.status === 'fulfilled') setDoctors(dc.value.data.items || []);
       if (st.status === 'fulfilled') setStatus(st.value.data);
+      if (rv.status === 'fulfilled') setRevenue(rv.value.data);
       setLoading(false);
     });
   }, [days]);
@@ -74,6 +77,14 @@ export default function Operations() {
               <StatCard tone="violet" icon="Scissors" label={t('operations.pendingSurgeries')} value={ov.pending_surgeries} />
               <StatCard tone="amber" icon="Image" label={t('operations.pendingImaging')} value={ov.pending_imaging} />
               <StatCard tone="teal" icon="Box" label={t('operations.lowStock')} value={ov.low_stock} />
+            </div>
+          </FadeIn>
+          <FadeIn delay={95}>
+            <div className="stat-grid">
+              <StatCard tone="green" icon="Receipt" label={t('operations.paidMonth')} value={formatMoney(ov.paid_month)} hint={t('operations.netRevenue')} />
+              <StatCard tone="primary" icon="CalendarCheck" label={t('operations.appointmentsToday')} value={ov.appointments_today} hint={t('operations.appointmentsPending') + ': ' + ov.appointments_pending} />
+              <StatCard tone="violet" icon="Armchair" label={t('operations.bedOccupancy')} value={`${ov.bed_occupancy}%`} hint={`${ov.beds_occupied}/${ov.beds_total}`} />
+              <StatCard tone="amber" icon="Wallet" label={t('operations.invoicesPending')} value={ov.invoices_pending} />
             </div>
           </FadeIn>
 
@@ -147,6 +158,75 @@ export default function Operations() {
                       </Badge>
                     </div>
                   ))}
+                </div>
+              </Card>
+            </FadeIn>
+          )}
+
+          {/* 住院床位占用 */}
+          {status && (status.beds || []).length > 0 && (
+            <FadeIn delay={220}>
+              <Card title={t('operations.bedStatus')}>
+                <Table
+                  rowKey="ward_id"
+                  columns={[
+                    { key: 'ward_name', label: t('operations.ward') },
+                    { key: 'total', label: t('operations.bedTotal') },
+                    { key: 'occupied', label: t('operations.bedOccupied') },
+                    {
+                      key: 'occupancy',
+                      label: t('operations.bedOccupancy'),
+                      render: (r) => (
+                        <Badge tone={r.occupancy >= 90 ? 'red' : r.occupancy >= 60 ? 'amber' : 'green'}>
+                          {r.occupancy}%
+                        </Badge>
+                      ),
+                    },
+                  ]}
+                  rows={status.beds || []}
+                  empty={t('common.empty')}
+                />
+              </Card>
+            </FadeIn>
+          )}
+
+          {/* 收入构成分析 */}
+          {revenue && (
+            <FadeIn delay={240}>
+              <Card title={t('operations.revenueBreakdown')}>
+                <div className="stat-grid" style={{ marginBottom: 16 }}>
+                  <StatCard tone="primary" icon="Receipt" label={t('operations.totalBilled')} value={formatMoney(revenue.total_billed)} />
+                  <StatCard tone="green" icon="Dollar" label={t('operations.totalPaid')} value={formatMoney(revenue.total_paid)} />
+                  <StatCard tone="red" icon="Undo" label={t('operations.totalRefund')} value={formatMoney(revenue.total_refund)} />
+                </div>
+
+                <div className="grid-2">
+                  <div>
+                    <h4 className="sub-head">{t('operations.byMethod')}</h4>
+                    <Table
+                      rowKey="method"
+                      columns={[
+                        { key: 'method', label: t('operations.method'), render: (r) => t(`billing.method.${r.method}`) },
+                        { key: 'count', label: t('operations.count') },
+                        { key: 'amount', label: t('operations.amount'), render: (r) => formatMoney(r.amount) },
+                      ]}
+                      rows={revenue.by_method || []}
+                      empty={t('common.empty')}
+                    />
+                  </div>
+                  <div>
+                    <h4 className="sub-head">{t('operations.byItem')}</h4>
+                    <Table
+                      rowKey="item_type"
+                      columns={[
+                        { key: 'item_type', label: t('operations.itemType'), render: (r) => t(`billing.itemType.${r.item_type}`) },
+                        { key: 'count', label: t('operations.count') },
+                        { key: 'amount', label: t('operations.amount'), render: (r) => formatMoney(r.amount) },
+                      ]}
+                      rows={revenue.by_item || []}
+                      empty={t('common.empty')}
+                    />
+                  </div>
                 </div>
               </Card>
             </FadeIn>

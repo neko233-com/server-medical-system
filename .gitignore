@@ -55,9 +55,19 @@ logs/
 # --------------------------------------------------------------------------- #
 node_modules/
 web/node_modules/
-web/dist/
+# 忽略构建产物，但保留目录本身（下面的 .gitkeep 例外）。
+# 注意：必须写成 web/dist/* 而不是 web/dist/，否则 git 不会进入被排除的目录，
+# 内部的 ! 例外规则也就不会生效。
+web/dist/*
+# 例外：保留占位文件，保证新克隆的仓库也能执行 `go build`
+# （前端 SPA 通过 go:embed 编译进二进制，缺少该目录会导致编译失败）。
+!web/dist/.gitkeep
 web/.vite/
-dist/
+# 仅忽略仓库根目录的 dist/；写成 /dist/ 才能避免连带排除 web/dist/ 目录，
+# 从而让下方的 !web/dist/.gitkeep 例外规则生效。
+/dist/
+# 例外：web/dist 需要保留占位文件（与上面的 dist/ 规则冲突时优先命中本条）。
+!web/dist/.gitkeep
 .vite/
 *.tsbuildinfo
 

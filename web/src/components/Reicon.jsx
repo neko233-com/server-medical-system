@@ -11,6 +11,7 @@ import {
   HardDrive, FileText, ClipboardList, CalendarCheck, Bandage, Dna, Microscope,
   Thermometer, TestTube, Armchair, Briefcase,
   MessageCircle, Send, Paperclip,
+  Receipt, Wallet, Minus, Undo,
 } from 'reicon';
 
 const ICONS = {
@@ -23,6 +24,7 @@ const ICONS = {
   HardDrive, FileText, ClipboardList, CalendarCheck, Bandage, Dna, Microscope,
   Thermometer, TestTube, Armchair, Briefcase,
   MessageCircle, Send, Paperclip,
+  Receipt, Wallet, Minus, Undo,
 };
 
 // Map semantic names that may not exist in the set to verified alternatives.

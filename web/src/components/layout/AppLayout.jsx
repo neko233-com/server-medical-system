@@ -16,6 +16,9 @@ const TITLES = {
   '/imaging': 'imaging.title',
   '/rbac': 'rbac.title',
   '/operations': 'operations.title',
+  '/appointments': 'appointments.title',
+  '/beds': 'beds.title',
+  '/billing': 'billing.title',
   '/settings': 'settings.title',
 };
 

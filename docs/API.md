@@ -56,6 +56,25 @@
 | PUT | `/api/medicines/:id/price` | 单独改价 | `medicine:manage` |
 | DELETE | `/api/medicines/:id` | 删除 | `medicine:manage` |
 
+## 预约 / 床位 / 收费
+
+| 方法 | 路径 | 说明 | 权限 |
+| --- | --- | --- | --- |
+| GET / POST | `/api/appointments` | 预约列表 / 新建预约 | `appointment:read` / `appointment:manage` |
+| GET / PUT / DELETE | `/api/appointments/:id` | 预约详情 / 修改 / 删除 | `appointment:read` / `appointment:manage` |
+| PUT | `/api/appointments/:id/status` | 状态流转（booked→arrived→completed / cancelled / no_show） | `appointment:manage` |
+| GET / POST | `/api/wards` | 病区列表 / 新建病区 | `bed:read` / `bed:manage` |
+| DELETE | `/api/wards/:id` | 删除病区（仍有床位时返回 409） | `bed:manage` |
+| GET / POST | `/api/beds` | 床位列表（可按 ward_id / status 过滤）/ 新建床位 | `bed:read` / `bed:manage` |
+| GET / PUT / DELETE | `/api/beds/:id` | 床位详情 / 修改 / 删除 | `bed:read` / `bed:manage` |
+| PUT | `/api/beds/:id/admit` | 办理入院（占床并记录时间戳；重复占床返回 409） | `bed:manage` |
+| PUT | `/api/beds/:id/discharge` | 办理出院（释放床位） | `bed:manage` |
+| GET / POST | `/api/invoices` | 结算单列表 / 开单 | `billing:read` / `billing:manage` |
+| GET / PUT / DELETE | `/api/invoices/:id` | 结算单详情 / 修改 / 删除（已收款返回 409） | `billing:read` / `billing:manage` |
+| POST / DELETE | `/api/invoices/:id/items` `/api/invoices/items/:itemId` | 增删收费明细并自动重算 | `billing:manage` |
+| POST | `/api/invoices/:id/pay` | 收款（payment_method: cash/card/wechat/alipay/insurance） | `billing:manage` |
+| POST | `/api/invoices/:id/refund` | 退费（状态流转，不删除记录） | `billing:manage` |
+
 ## 门诊房间
 
 | 方法 | 路径 | 说明 | 权限 |

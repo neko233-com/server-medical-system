@@ -42,6 +42,7 @@ func RegisterOperations(r gin.IRouter, db *gorm.DB) {
 		rep.GET("/operations/departments", h.Departments)
 		rep.GET("/operations/doctors", h.Doctors)
 		rep.GET("/operations/status", h.Status)
+		rep.GET("/operations/revenue", h.Revenue)
 	}
 }
 
@@ -109,6 +110,11 @@ func (h *OperationsHandler) Overview(c *gin.Context) {
 		activeRooms       int64
 		onlinePrinters    int64
 		lowStockMedicines int64
+		todayAppts        int64
+		pendingAppts      int64
+		totalBeds         int64
+		occupiedBeds      int64
+		pendingInvoices   int64
 	)
 
 	// 规模指标：累计患者数、在岗医生数。
@@ -119,6 +125,10 @@ func (h *OperationsHandler) Overview(c *gin.Context) {
 	h.db.Model(&models.MedicalCase{}).Where("visit_date >= ?", today).Count(&todayVisits)
 	// 今日处方数。
 	h.db.Model(&models.Prescription{}).Where("created_at >= ?", today).Count(&todayPresc)
+
+	// 预约挂号：今日排班量与仍待到诊的预约数。
+	h.db.Model(&models.Appointment{}).Where("slot_at >= ? AND slot_at < ?", today, today.AddDate(0, 0, 1)).Count(&todayAppts)
+	h.db.Model(&models.Appointment{}).Where("status = ?", "booked").Count(&pendingAppts)
 
 	// 待处理：尚未开台的手术、尚未出具报告的影像检查。
 	h.db.Model(&models.Surgery{}).Where("status = ?", "planned").Count(&pendingSurgeries)
@@ -135,24 +145,60 @@ func (h *OperationsHandler) Overview(c *gin.Context) {
 		Where("is_active = ? AND reorder_level > 0 AND stock_qty <= reorder_level", true).
 		Count(&lowStockMedicines)
 
-	// 收入核算：今日与本月处方金额合计（处方金额即药费收入口径）。
+	// 住院资源：总床位与已占用床位（占用率由前端计算）。
+	h.db.Model(&models.Bed{}).Count(&totalBeds)
+	h.db.Model(&models.Bed{}).Where("status = ?", "occupied").Count(&occupiedBeds)
+
+	// 收费：待结算（pending）单据数量。
+	h.db.Model(&models.Invoice{}).Where("status = ?", "pending").Count(&pendingInvoices)
+
+	// 收入核算：处方金额（药费口径）与结算单实收（综合口径）。
 	var todayRevenueRaw, monthRevenueRaw []float64
 	h.db.Model(&models.Prescription{}).Where("created_at >= ?", today).Pluck("total_amount", &todayRevenueRaw)
 	h.db.Model(&models.Prescription{}).Where("created_at >= ?", monthStart).Pluck("total_amount", &monthRevenueRaw)
 
+	// 实收金额以 paid_at 落账时间为准，退款单不计入收入。
+	var todayPaidRaw, monthPaidRaw []float64
+	h.db.Model(&models.Invoice{}).
+		Where("status = ? AND paid_at >= ?", "paid", today).
+		Pluck("total", &todayPaidRaw)
+	h.db.Model(&models.Invoice{}).
+		Where("status = ? AND paid_at >= ?", "paid", monthStart).
+		Pluck("total", &monthPaidRaw)
+
+	// 本月退费金额（用于计算净收入）。
+	var monthRefundRaw []float64
+	h.db.Model(&models.Invoice{}).
+		Where("status = ? AND updated_at >= ?", "refunded", monthStart).
+		Pluck("total", &monthRefundRaw)
+
+	occupancy := 0.0
+	if totalBeds > 0 {
+		occupancy = float64(occupiedBeds) / float64(totalBeds) * 100
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"patients":            totalPatients,
-		"doctors":             totalDoctors,
-		"visits_today":        todayVisits,
-		"prescriptions_today": todayPresc,
-		"revenue_today":       round2(sumFloat(todayRevenueRaw)),
-		"revenue_month":       round2(sumFloat(monthRevenueRaw)),
-		"pending_surgeries":   pendingSurgeries,
-		"pending_imaging":     pendingImaging,
-		"rooms_active":        activeRooms,
-		"printers_online":     onlinePrinters,
-		"low_stock":           lowStockMedicines,
-		"currency":            "CNY",
+		"patients":             totalPatients,
+		"doctors":              totalDoctors,
+		"visits_today":         todayVisits,
+		"prescriptions_today":  todayPresc,
+		"revenue_today":        round2(sumFloat(todayRevenueRaw)),
+		"revenue_month":        round2(sumFloat(monthRevenueRaw)),
+		"paid_today":           round2(sumFloat(todayPaidRaw)),
+		"paid_month":           round2(sumFloat(monthPaidRaw)),
+		"net_revenue_month":    round2(sumFloat(monthPaidRaw) - sumFloat(monthRefundRaw)),
+		"pending_surgeries":    pendingSurgeries,
+		"pending_imaging":      pendingImaging,
+		"rooms_active":         activeRooms,
+		"printers_online":      onlinePrinters,
+		"low_stock":            lowStockMedicines,
+		"appointments_today":   todayAppts,
+		"appointments_pending": pendingAppts,
+		"beds_total":           totalBeds,
+		"beds_occupied":        occupiedBeds,
+		"bed_occupancy":        round2(occupancy),
+		"invoices_pending":     pendingInvoices,
+		"currency":             "CNY",
 	})
 }
 
@@ -343,10 +389,147 @@ func (h *OperationsHandler) Status(c *gin.Context) {
 	var recentJobs []models.PrintJob
 	h.db.Order("id desc").Limit(10).Find(&recentJobs)
 
+	// 住院床位按病区聚合，附带占用率，供管理员查看床位周转。
+	type wardStat struct {
+		WardID   uint
+		WardName string
+		Total    int64
+		Occupied int64
+	}
+	var wardStats []wardStat
+	h.db.Model(&models.Bed{}).
+		Select("ward_id, ward_name, count(*) as total, sum(case when status = ? then 1 else 0 end) as occupied", "occupied").
+		Group("ward_id, ward_name").
+		Scan(&wardStats)
+
+	bedItems := make([]gin.H, 0, len(wardStats))
+	for _, w := range wardStats {
+		rate := 0.0
+		if w.Total > 0 {
+			rate = float64(w.Occupied) / float64(w.Total) * 100
+		}
+		bedItems = append(bedItems, gin.H{
+			"ward_id":   w.WardID,
+			"ward_name": w.WardName,
+			"total":     w.Total,
+			"occupied":  w.Occupied,
+			"occupancy": round2(rate),
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"rooms":       roomItems,
 		"printers":    printers,
 		"recent_jobs": recentJobs,
+		"beds":        bedItems,
+	})
+}
+
+// ===========================================================================
+//  6. 收入构成分析
+// ===========================================================================
+
+// Revenue breaks down the hospital's billing income for the requested window.
+//
+// It returns three views that administrators actually reconcile against:
+//   - by_status  : how much money sits in each invoice state (pending/paid/...)
+//   - by_method  : cash vs card vs mobile payment vs insurance
+//   - by_item    : which charge categories (consult/medicine/exam/surgery/bed) drive revenue
+//
+// Only paid invoices contribute to "revenue"; the rest are reported separately
+// so receivables remain visible.
+func (h *OperationsHandler) Revenue(c *gin.Context) {
+	days := parseDays(c, 30)
+	today := startOfToday()
+	start := today.AddDate(0, 0, -(days - 1))
+
+	// --- 按结算单状态统计金额与笔数 ---
+	type statusRow struct {
+		Status string
+		Count  int64
+		Amount float64
+	}
+	var statusRows []statusRow
+	h.db.Model(&models.Invoice{}).
+		Where("created_at >= ?", start).
+		Select("status, count(*) as count, sum(total) as amount").
+		Group("status").
+		Scan(&statusRows)
+
+	byStatus := make([]gin.H, 0, len(statusRows))
+	var totalBilled, totalPaid float64
+	for _, r := range statusRows {
+		byStatus = append(byStatus, gin.H{
+			"status": r.Status,
+			"count":  r.Count,
+			"amount": round2(r.Amount),
+		})
+		totalBilled += r.Amount
+		if r.Status == "paid" {
+			totalPaid += r.Amount
+		}
+	}
+
+	// --- 按支付方式统计（仅已收款） ---
+	type methodRow struct {
+		Method string
+		Count  int64
+		Amount float64
+	}
+	var methodRows []methodRow
+	h.db.Model(&models.Invoice{}).
+		Where("status = ? AND paid_at >= ?", "paid", start).
+		Select("payment_method as method, count(*) as count, sum(total) as amount").
+		Group("payment_method").
+		Scan(&methodRows)
+
+	byMethod := make([]gin.H, 0, len(methodRows))
+	for _, r := range methodRows {
+		byMethod = append(byMethod, gin.H{
+			"method": r.Method,
+			"count":  r.Count,
+			"amount": round2(r.Amount),
+		})
+	}
+
+	// --- 按收费项目类别统计（基于已收款结算单的明细） ---
+	type itemRow struct {
+		ItemType string
+		Count    int64
+		Amount   float64
+	}
+	var itemRows []itemRow
+	h.db.Model(&models.InvoiceItem{}).
+		Joins("join invoices on invoices.id = invoice_items.invoice_id").
+		Where("invoices.status = ? AND invoices.paid_at >= ?", "paid", start).
+		Select("invoice_items.item_type as item_type, count(*) as count, sum(invoice_items.amount) as amount").
+		Group("invoice_items.item_type").
+		Scan(&itemRows)
+
+	byItem := make([]gin.H, 0, len(itemRows))
+	for _, r := range itemRows {
+		byItem = append(byItem, gin.H{
+			"item_type": r.ItemType,
+			"count":     r.Count,
+			"amount":    round2(r.Amount),
+		})
+	}
+
+	// 退费金额单独列出，避免与实收混淆。
+	var refundRaw []float64
+	h.db.Model(&models.Invoice{}).
+		Where("status = ? AND updated_at >= ?", "refunded", start).
+		Pluck("total", &refundRaw)
+
+	c.JSON(http.StatusOK, gin.H{
+		"days":         days,
+		"total_billed": round2(totalBilled),
+		"total_paid":   round2(totalPaid),
+		"total_refund": round2(sumFloat(refundRaw)),
+		"by_status":    byStatus,
+		"by_method":    byMethod,
+		"by_item":      byItem,
+		"currency":     "CNY",
 	})
 }
 

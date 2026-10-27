@@ -2,6 +2,8 @@ package db
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
@@ -33,6 +35,14 @@ func Init(cfg *config.Config) (*gorm.DB, error) {
 		}
 		database, err = gorm.Open(mysql.Open(cfg.DBDSN), &gorm.Config{})
 	default: // sqlite
+		// Ensure the parent directory of the SQLite file exists. A fresh
+		// deployment defaults to ./data/medical.db, and SQLite will not create
+		// intermediate directories on its own.
+		if dir := filepath.Dir(cfg.DBPath); dir != "" && dir != "." {
+			if mkErr := os.MkdirAll(dir, 0o755); mkErr != nil {
+				return nil, fmt.Errorf("create database directory %s: %w", dir, mkErr)
+			}
+		}
 		database, err = gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	}
 	if err != nil {
@@ -56,6 +66,11 @@ func Init(cfg *config.Config) (*gorm.DB, error) {
 		&models.ImagingStudy{},
 		&models.ImagingImage{},
 		&models.ChatMessage{},
+		&models.Appointment{},
+		&models.Ward{},
+		&models.Bed{},
+		&models.Invoice{},
+		&models.InvoiceItem{},
 	); err != nil {
 		return nil, err
 	}
@@ -68,6 +83,7 @@ func Seed(database *gorm.DB, seedDemo bool) {
 	seed.SeedRBAC(database)
 	seed.SeedUsers(database, seedDemo)
 	seed.SeedRooms(database, seedDemo)
+	seed.SeedWards(database, seedDemo)
 	seed.SeedPrinters(database, seedDemo)
 	seed.SeedMedicines(database)
 }

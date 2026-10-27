@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 // The default HTTP port for the medical system.
 // Historically this was 8080, which very often collides with proxies,
@@ -43,7 +46,15 @@ type Config struct {
 }
 
 // Load reads configuration from the environment, applying sensible defaults.
+//
+// Resolution order (first wins): real environment variables → ENV_FILE/.env
+// values → built-in defaults. This makes the binary work with zero
+// configuration while still allowing file-based ops workflows.
 func Load() *Config {
+	// Apply .env (if present) before reading anything so both sources unify.
+	for _, f := range EnvFiles(os.Getenv("ENV_FILE")) {
+		LoadDotEnv(f)
+	}
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = DefaultPort
@@ -56,10 +67,6 @@ func Load() *Config {
 	driver := os.Getenv("DB_DRIVER")
 	if driver == "" {
 		driver = "sqlite"
-	}
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		dbPath = "medical.db"
 	}
 	dbDSN := os.Getenv("DB_DSN")
 	defaultLang := os.Getenv("DEFAULT_LANG")
@@ -78,6 +85,13 @@ func Load() *Config {
 	logDir := os.Getenv("LOG_DIR")
 	if logDir == "" {
 		logDir = "./logs"
+	}
+	// The SQLite database lives under ./data by default (relative to the
+	// working directory). Service deployments should set DB_PATH explicitly —
+	// the generated .env does exactly that with an absolute path.
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = filepath.Join("data", "medical.db")
 	}
 
 	return &Config{

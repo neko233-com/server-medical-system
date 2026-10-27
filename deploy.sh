@@ -64,7 +64,11 @@ cd "$ROOT_DIR"
 # --------------------------------------------------------------------------- #
 if [ "$SKIP_WEB" = "1" ]; then
   warn "跳过前端构建 (SKIP_WEB=1)"
-  [ -d "web/dist" ] || warn "注意：web/dist 不存在，部署后页面可能无法显示"
+  if [ ! -f "web/dist/index.html" ]; then
+    warn "警告：web/dist/index.html 不存在，编译出的二进制将仅提供 API（无前端界面）"
+  else
+    ok "复用已有的 web/dist"
+  fi
 else
   log "构建前端..."
   if [ ! -d "web/node_modules" ]; then
@@ -75,17 +79,18 @@ else
 fi
 
 # --------------------------------------------------------------------------- #
-#  3. 构建后端二进制（静态链接，产物置于仓库根，便于单文件拷贝部署）
+#  3. 构建后端二进制（静态链接，前端 SPA 通过 go:embed 编译进二进制）
 #     -trimpath 移除本地绝对路径，保证构建可复现；
 #     -ldflags 精简符号表与 DWARF，显著减小体积（打包优化）。
 # --------------------------------------------------------------------------- #
 log "构建后端二进制..."
+# web/dist 必须先于 go build 存在，否则嵌入的前端为空。
 CGO_ENABLED=$CGO_ENABLED_VALUE go build \
   -trimpath \
   -ldflags="-s -w" \
   -o "$APP_NAME" \
   ./cmd/server || die "后端编译失败"
-ok "后端构建完成 → ./$APP_NAME"
+ok "后端构建完成 → ./$APP_NAME（单文件即含前端，拷贝该文件即可部署）"
 
 # 确保运行时目录存在（影像样片存放于 ./uploads）
 mkdir -p uploads
@@ -111,7 +116,7 @@ fi
 echo
 ok "服务即将启动：http://localhost:${PORT}"
 echo "${YELLOW}---------------------------------------------------------------${NC}"
-echo "  默认账号： admin / admin123          （首次部署后请立即修改密码）"
+echo "  默认账号： root / root              （首次部署后请立即修改密码）"
 echo "  停止服务： Ctrl+C"
 echo "${YELLOW}---------------------------------------------------------------${NC}"
 echo

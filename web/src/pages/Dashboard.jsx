@@ -8,13 +8,16 @@ import FadeIn from '../components/anim/FadeIn';
 import Reicon from '../components/Reicon';
 import { genderLabel } from '../utils/format';
 
-// The four newly integrated hospital-operations modules. Each is permission-gated
-// so a user only sees the stat card / shortcut for modules they are allowed to use.
+// The integrated hospital-operations modules. Each is permission-gated so a user
+// only sees the stat card / shortcut for modules they are allowed to use.
 const MODULES = [
   { key: 'rooms', perm: 'room:read', route: '/rooms', icon: 'Building', tone: 'primary' },
   { key: 'printers', perm: 'printer:read', route: '/printers', icon: 'Printer', tone: 'teal' },
   { key: 'surgeries', perm: 'surgery:read', route: '/surgeries', icon: 'Scissors', tone: 'violet' },
   { key: 'imaging', perm: 'imaging:read', route: '/imaging', icon: 'Image', tone: 'amber' },
+  { key: 'appointments', perm: 'appointment:read', route: '/appointments', icon: 'CalendarCheck', tone: 'primary' },
+  { key: 'beds', perm: 'bed:read', route: '/beds', icon: 'Armchair', tone: 'green' },
+  { key: 'billing', perm: 'billing:read', route: '/billing', icon: 'Receipt', tone: 'teal' },
 ];
 
 export default function Dashboard() {
@@ -31,6 +34,9 @@ export default function Dashboard() {
     printers: 0,
     surgeries: 0,
     imaging: 0,
+    appointments: 0,
+    beds: 0,
+    billing: 0,
   });
   const [recent, setRecent] = useState([]);
 
@@ -46,8 +52,11 @@ export default function Dashboard() {
       client.get('/printers?page_size=1'),
       client.get('/surgeries?page_size=1'),
       client.get('/imaging?page_size=1'),
+      client.get('/appointments?page_size=1'),
+      client.get('/beds?page_size=1'),
+      client.get('/invoices?page_size=1'),
     ])
-      .then(([p, m, rx, cs, rm, pr, sg, im]) => {
+      .then(([p, m, rx, cs, rm, pr, sg, im, ap, bd, bl]) => {
         const total = (res, d = 0) =>
           res.status === 'fulfilled' && res.value?.data?.pagination ? res.value.data.pagination.total : d;
         const today = new Date().toISOString().slice(0, 10);
@@ -63,6 +72,9 @@ export default function Dashboard() {
           printers: total(pr),
           surgeries: total(sg),
           imaging: total(im),
+          appointments: total(ap),
+          beds: total(bd),
+          billing: total(bl),
         });
         setRecent(cs.status === 'fulfilled' ? (cs.value?.data?.items || []) : []);
       })

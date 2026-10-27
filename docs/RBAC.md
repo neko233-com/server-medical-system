@@ -11,12 +11,12 @@
 ```
 
 - **角色（Role）**：7 种内置角色，`IsSystem=true` 的系统角色不可删除（保证升级安全）。
-- **权限（Permission）**：26 项细粒度权限码，形如 `资源:动作`。
+- **权限（Permission）**：32 项细粒度权限码，形如 `资源:动作`。
 - **用户级覆盖**：在角色之外单独授予某项权限，或撤销角色自带的权限（实现「这个护士临时可以看影像」这类例外）。
 
 > 计算逻辑见 `internal/rbac/rbac.go` 的 `UserPermissions()`；**这是权限的唯一真相来源**，中间件与前端共用。
 
-## 二、26 项权限清单
+## 二、32 项权限清单
 
 | 权限码 | 中文 | 说明 |
 | --- | --- | --- |
@@ -41,6 +41,12 @@
 | `printer:manage` | 管理打印机 | 管理打印机 |
 | `inventory:read` | 查看库存 | 浏览药品库存 |
 | `inventory:manage` | 管理库存 | 入库/出库与盘点 |
+| `appointment:read` | 查看预约 | 浏览预约挂号 |
+| `appointment:manage` | 管理预约 | 预约建档/改期/到诊确认 |
+| `bed:read` | 查看床位 | 浏览病区与床位 |
+| `bed:manage` | 管理床位 | 入院/出院/床位调配 |
+| `billing:read` | 查看收费 | 浏览结算单 |
+| `billing:manage` | 管理收费 | 开单/收费/退费 |
 | `report:read` | **运营报表** | **查看全院运营分析与后台运营** |
 | `user:read` | 查看账号 | 浏览用户账号（管理属性） |
 | `user:manage` | 管理账号 | 增删改账号、分配角色 |
@@ -72,11 +78,19 @@
 | `printer:manage` | ✅ | | | | | | |
 | `inventory:read` | ✅ | | | | | | ✅ |
 | `inventory:manage` | ✅ | | | | | | ✅ |
+| `appointment:read` | ✅ | ✅ | ✅ | ✅ | | | |
+| `appointment:manage` | ✅ | | | ✅ | | | |
+| `bed:read` | ✅ | | ✅ | ✅ | | | |
+| `bed:manage` | ✅ | | ✅ | | | | |
+| `billing:read` | ✅ | ✅ | | ✅ | | | |
+| `billing:manage` | ✅ | | | ✅ | | | |
 | `report:read` | ✅ | | | | | | |
 | `user:read` / `user:manage` | ✅ | | | | | | |
 | `role:read` / `role:manage` | ✅ | | | | | | |
 
 > **安全设计**：`user:read` 刻意不授予医生——列出全院账号属管理操作，医护人员如需选择同事，应使用面向所有登录用户的精简端点 `GET /api/rbac/directory`（仅返回姓名/科室等必要字段）。
+>
+> 同理，`appointment:manage` 只授予挂号收费岗：医生可查看自己的排班（`appointment:read`），但不能替他人改期或删除预约。
 
 ## 四、强制校验位置
 
@@ -96,7 +110,7 @@ r.POST("/surgeries", middleware.RequireAny(db, "surgery:manage"), h.Create)
 
 | 角色 | 用户名 | 密码 |
 | --- | --- | --- |
-| 管理员 | `admin` | `admin123` |
+| 管理员 | `root` | `root` |
 | 医生 | `doctor` | `doctor123` |
 | 护士 | `nurse` | `nurse123` |
 | 挂号收费 | `reception` | `recept123` |

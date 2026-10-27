@@ -13,6 +13,9 @@ import Surgeries from './pages/Surgeries';
 import Imaging from './pages/Imaging';
 import RBAC from './pages/RBAC';
 import Operations from './pages/Operations';
+import Appointments from './pages/Appointments';
+import Beds from './pages/Beds';
+import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import PrescriptionPrint from './pages/print/PrescriptionPrint';
 
@@ -49,6 +52,10 @@ export default function App() {
         <Route path="rbac" element={<RBAC />} />
         {/* 后台运营（全院核算），受 report:read 权限保护 */}
         <Route path="operations" element={<Operations />} />
+        {/* 门诊全流程：预约挂号 / 住院床位 / 收费结算 */}
+        <Route path="appointments" element={<Appointments />} />
+        <Route path="beds" element={<Beds />} />
+        <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
